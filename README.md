@@ -9,3 +9,8 @@ I intend to create a simple game using [`raylib`](https://www.raylib.com/) and `
 ```sh
 make test
 ```
+
+## Running the super basic benchmark
+```sh
+make benchmark
+```

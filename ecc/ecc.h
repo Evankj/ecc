@@ -26,6 +26,8 @@ Arena *ArenaCreate(size_t size) {
   }
 
   arena->capacity = size;
+
+
   arena->top = 0;
 
   return arena;
@@ -40,6 +42,8 @@ void ArenaDestroy(Arena *arena) {
 // Basically just store pointer to top, bump top up by size and assign data into
 // pointer <-> top
 void *ArenaAllocate(Arena *arena, size_t size) {
+
+
   if (arena->top + size > arena->capacity) {
     return NULL;
   }
@@ -251,6 +255,10 @@ size_t BucketCreateEntity(Bucket *bucket) {
   // }
 
   size_t index = bucket->entityListEnd++;
+  Entity *entity = bucket->entities[index];
+
+  entity->mask = 0;
+  entity->index = index;
 
   bucket->entityCount++;
 
@@ -269,7 +277,8 @@ void BucketDeleteEntity(Bucket *bucket, size_t index) {
 
   bucket->entityCount--;
 
-  LinkedListPush(bucket->freeIndexes, &index);
+  // LinkedListPush(bucket->freeIndexes, &index);
+  //
 }
 
 ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size) {
@@ -295,11 +304,12 @@ void AddComponentToEntityById(Bucket *bucket, size_t entityId,
   }
 
   Entity *entity = bucket->entities[entityId];
-  if (!entity) {
+  if (entity == NULL) {
     return;
   }
 
   entity->mask |= componentType->mask;
+
 
   componentType->entries[entity->index] = component;
 }
@@ -327,7 +337,6 @@ void *GetComponentForEntityById(Bucket *bucket, size_t entityId,
   }
 
   Entity *entity = bucket->entities[entityId];
-
 
   if (!((entity->mask & componentType->mask) == componentType->mask)) {
     return NULL;
