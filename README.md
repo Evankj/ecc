@@ -14,3 +14,16 @@ make test
 ```sh
 make benchmark
 ```
+
+## Complexity
+I am actively trying to keep this project simple and easy to work with, current LoC stats are provided below.
+
+```
+===============================================================================
+ Language            Files        Lines         Code     Comments       Blanks
+===============================================================================
+ C Header                1          346          219           45           82
+===============================================================================
+ Total                   1          346          219           45           82
+===============================================================================
+```
