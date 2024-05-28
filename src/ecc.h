@@ -1,5 +1,5 @@
-#include <cstddef>
-#include <cstdlib>
+#include <stdio.h>
+#include <stdlib.h>
 
 // Memory Arena utilities
 // ---------------------------------------------------------------------------------------------------
@@ -12,7 +12,7 @@ typedef struct {
 // Need to be able to create, free, allocate to and pop from arenas
 
 // Create
-inline Arena *ArenaCreate(size_t size) {
+Arena *ArenaCreate(size_t size) {
   Arena *arena = (Arena *)malloc(sizeof(Arena));
   if (!arena) {
     return NULL;
@@ -32,14 +32,14 @@ inline Arena *ArenaCreate(size_t size) {
 }
 
 // Free
-inline void ArenaDestroy(Arena *arena) {
+void ArenaDestroy(Arena *arena) {
   free(arena->data);
   free(arena);
 }
 
 // Basically just store pointer to top, bump top up by size and assign data into
 // pointer <-> top
-inline void *ArenaAllocate(Arena *arena, size_t size) {
+void *ArenaAllocate(Arena *arena, size_t size) {
   if (arena->top + size > arena->capacity) {
     return NULL;
   }
@@ -56,7 +56,7 @@ inline void *ArenaAllocate(Arena *arena, size_t size) {
 
 typedef struct LinkedListNode {
   void *value;
-  LinkedListNode *next;
+  struct LinkedListNode *next;
 } LinkedListNode;
 
 typedef struct LinkedList {
@@ -65,23 +65,21 @@ typedef struct LinkedList {
   Arena *arena;
 } LinkedList;
 
-inline LinkedList *LinkedListCreate(Arena *arena) {
+LinkedList *LinkedListCreate(Arena *arena) {
   LinkedList *linkedList =
       (LinkedList *)ArenaAllocate(arena, sizeof(LinkedList));
   if (!linkedList) {
     return NULL;
   }
 
-  *linkedList = (LinkedList){
-      .head = NULL,
-      .length = 0,
-      .arena = arena,
-  };
+  linkedList->head = NULL;
+  linkedList->length = 0;
+  linkedList->arena = arena;
 
   return linkedList;
 }
 
-inline LinkedListNode *LinkedListPush(LinkedList *list, void *value) {
+LinkedListNode *LinkedListPush(LinkedList *list, void *value) {
   // allocate new node in list's arena
   LinkedListNode *node =
       (LinkedListNode *)ArenaAllocate(list->arena, sizeof(LinkedListNode));
@@ -89,10 +87,8 @@ inline LinkedListNode *LinkedListPush(LinkedList *list, void *value) {
     return NULL;
   }
 
-  *node = {
-      .value = value,
-      .next = NULL,
-  };
+  node->value = value;
+  node->next = NULL;
 
   LinkedListNode *head = list->head;
   if (head) {
@@ -106,19 +102,23 @@ inline LinkedListNode *LinkedListPush(LinkedList *list, void *value) {
   return node;
 }
 
-inline LinkedListNode *LinkedListPop(LinkedList *list) {
+void *LinkedListPop(LinkedList *list) {
 
-  LinkedListNode *head = list->head;
-  if (!head) {
+  if (!list->head) {
     return NULL;
   }
-  list->head = head->next;
 
-  list->length--;
+  LinkedListNode *head = list->head;
+  void *val = head->value;
 
-  return head;
+  list->head = list->head->next;
+
+  if (list->length > 0) {
+    list->length--;
+  }
+
+  return val;
 }
-
 
 // ---------------------------------------------------------------------------------------------------
 
@@ -137,7 +137,7 @@ inline LinkedListNode *LinkedListPop(LinkedList *list) {
 
 // So I can change it later to support > 63 component types (0 is no components)
 typedef size_t BitMask;
-const size_t MAX_COMPONENT_TYPES = sizeof(BitMask);
+const size_t MAX_COMPONENT_TYPES = 63;
 
 typedef struct {
   BitMask mask; // The bitmask of this component type
@@ -147,8 +147,8 @@ typedef struct {
 
   size_t componentSize; // The size of an individual component of this type
 
-  void *entries[]; // array of pointers to actual structs containing the
-                   // information for this component on a given entity
+  void *entries[]; // pointer to array of pointers to actual structs containing
+                   // the information for this component on a given entity
 
 } ComponentType;
 
@@ -163,6 +163,7 @@ typedef struct {
   ComponentType *components[MAX_COMPONENT_TYPES];
   size_t entityCount;
   LinkedList *freeIndexes;
+  size_t maxEntities;
   size_t entityListEnd;
   Entity *entities[]; // The array of entities to hold all added entities (There
                       // can be NULL elements if entities are deleted and their
@@ -175,27 +176,24 @@ typedef struct {
   BitMask excludeMask;
 } Query;
 
-inline Query *QueryCreate(Bucket *bucket) {
+Query *QueryCreate(Bucket *bucket) {
   Query *query = (Query *)ArenaAllocate(bucket->arena, sizeof(Query));
-  *query = {
-      .bucket = bucket,
-      .includeMask = 0,
-      .excludeMask = 0,
-  };
+  query->bucket = bucket;
+  query->includeMask = 0;
+  query->excludeMask = 0;
 
   return query;
 }
 
-inline void QueryWithComponentType(Query *query, ComponentType *componentType) {
+void QueryWithComponentType(Query *query, ComponentType *componentType) {
   query->includeMask &= componentType->mask;
 }
 
-inline void QueryWithoutComponentType(Query *query,
-                                      ComponentType *componentType) {
+void QueryWithoutComponentType(Query *query, ComponentType *componentType) {
   query->excludeMask &= componentType->mask;
 }
 
-inline Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
+Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
   Bucket *bucket = (Bucket *)ArenaAllocate(arena, sizeof(Bucket));
   if (!bucket) {
     return NULL;
@@ -206,51 +204,61 @@ inline Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
   bucket->entityCount = 0;
   bucket->entityListEnd = 0;
   bucket->freeIndexes = LinkedListCreate(arena);
+  bucket->maxEntities = maxEntities;
 
   // allocate component arrays
   size_t pos = arena->top;
 
-  for (size_t i = 0; i < MAX_COMPONENT_TYPES; ++i) {
-    bucket->components[i] =
+  for (size_t i = 0; i < MAX_COMPONENT_TYPES; i++) {
+    ComponentType *component =
         (ComponentType *)ArenaAllocate(arena, sizeof(ComponentType));
-    if (!bucket->components[i]) {
+    if (!component) {
       // something went wrong, free allocated component types from the arena and
       // exit
       arena->top = pos;
       return NULL;
     }
+    component->mask = 0;
+    component->componentId = 0;
+    component->componentSize = 0;
+    bucket->components[i] = component;
   }
-  for (size_t i = 0; i < maxEntities; ++i) {
-    bucket->entities[i] = (Entity *)ArenaAllocate(arena, sizeof(Entity));
-    if (!bucket->entities[i]) {
+
+  for (size_t i = 0; i < maxEntities; i++) {
+    Entity *entity = (Entity *)ArenaAllocate(arena, sizeof(Entity));
+    if (!entity) {
       // something went wrong, free allocated component types and entitise from
       // the arena and exit
       arena->top = pos;
       return NULL;
     }
+    entity->mask = 0;
+    entity->index = i;
+    bucket->entities[i] = entity;
   }
 
   return bucket;
 }
 
-inline size_t BucketCreateEntity(Bucket *bucket) {
-  LinkedListNode *node = LinkedListPop(bucket->freeIndexes);
-  size_t *val = (size_t *)node->value;
-  size_t index = -1;
-  if (!val) {
-    // no free index to use, go from bucket end pointer
-    index = bucket->entityListEnd++;
-  } else {
-    // free index found, use that instead
-    index = *val;
-  }
+size_t BucketCreateEntity(Bucket *bucket) {
+
+  // size_t index;
+  // size_t val = (size_t)LinkedListPop(bucket->freeIndexes);
+  // if (!val) {
+  //   index = bucket->entityListEnd++;
+  // } else {
+  //   index = val;
+  // }
+
+  size_t index = bucket->entityListEnd++;
+
   bucket->entityCount++;
 
   return index;
 }
 
-inline void BucketDeleteEntity(Bucket *bucket, size_t index) {
-  if (index >= bucket->entityListEnd) {
+void BucketDeleteEntity(Bucket *bucket, size_t index) {
+  if (index < 0 || index >= bucket->entityListEnd) {
     return;
   }
 
@@ -259,10 +267,12 @@ inline void BucketDeleteEntity(Bucket *bucket, size_t index) {
     entity->mask = 0;
   }
 
+  bucket->entityCount--;
+
   LinkedListPush(bucket->freeIndexes, &index);
 }
 
-inline ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size) {
+ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size) {
   size_t index = bucket->componentIdTop++;
 
   ComponentType *component = bucket->components[index];
@@ -271,22 +281,57 @@ inline ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size) {
   component->componentSize = size;
   component->componentId = index; // this is probably unnecessary??
 
+  for (int i = 0; i < bucket->maxEntities; i++) {
+    component->entries[i] = ArenaAllocate(bucket->arena, size);
+  }
+
   return component;
 }
 
-inline void AddComponentToEntityById(Bucket *bucket, Entity *entity,
-                                     ComponentType *componentType,
-                                     void *component) {
-  entity->mask &= componentType->mask;
+void AddComponentToEntityById(Bucket *bucket, size_t entityId,
+                              ComponentType *componentType, void *component) {
+  if (entityId < 0 || entityId > bucket->entityListEnd) {
+    return;
+  }
+
+  Entity *entity = bucket->entities[entityId];
+  if (!entity) {
+    return;
+  }
+
+  entity->mask |= componentType->mask;
+
   componentType->entries[entity->index] = component;
 }
 
-inline void RemoveComponentFromEntityById(Bucket *bucket, Entity *entity,
-                                          ComponentType *componentType) {
+void RemoveComponentFromEntityById(Bucket *bucket, size_t entityId,
+                                   ComponentType *componentType) {
+
+  if (entityId < 0 || entityId > bucket->entityListEnd) {
+    return;
+  }
+
+  Entity *entity = bucket->entities[entityId];
   entity->mask &= ~componentType->mask;
 
   componentType->entries[entity->index] =
       NULL; // probably don't actually have to do this as it's no longer in the
             // mask and this isn't saving any space
             // TODO: Come back to this
+}
+
+void *GetComponentForEntityById(Bucket *bucket, size_t entityId,
+                                ComponentType *componentType) {
+  if (entityId < 0 || entityId > bucket->entityListEnd) {
+    return NULL;
+  }
+
+  Entity *entity = bucket->entities[entityId];
+
+
+  if (!((entity->mask & componentType->mask) == componentType->mask)) {
+    return NULL;
+  }
+
+  return componentType->entries[entityId];
 }
