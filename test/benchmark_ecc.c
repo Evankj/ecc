@@ -14,7 +14,7 @@ typedef struct {
 } ExampleComponent;
 
 
-void benchmark(int iterations) {
+void RunBenchmark(int iterations) {
 
   // fprintf(stdout, "Creating arena...\n");
   Arena *arena = ArenaCreate(ARENA_SIZE);
@@ -87,6 +87,6 @@ int main(int argc, char **argv) {
     iterations = atoi(argv[1]);
   }
 
-  benchmark(iterations);
+  RunBenchmark(iterations);
   return 0;
 }

@@ -13,7 +13,7 @@ const int MB = KB * 1024;
 
 const int TEST_ARENA_SIZE = MB * 10; // 10mb
 
-void testCreateBucket() {
+void TestCreateBucket() {
 
   int expectedEntityCount = 3;
   int entityCount = -1;
@@ -32,10 +32,10 @@ void testCreateBucket() {
 
   ASSERT(entityCount == expectedEntityCount);
 
-  printf("testCreateBucket        PASSED\n");
+  printf("TestCreateBucket        PASSED\n");
 }
 
-void testDeleteEntityFromBucket() {
+void TestDeleteEntityFromBucket() {
   int expectedEntityCount = 0;
   int entityCount = -1;
 
@@ -53,10 +53,10 @@ void testDeleteEntityFromBucket() {
 
   ASSERT(entityCount == expectedEntityCount);
 
-  printf("testDeleteEntityFromBucket        PASSED\n");
+  printf("TestDeleteEntityFromBucket        PASSED\n");
 }
 
-void testAssignComponentTypeToEntity() {
+void TestAssignComponentTypeToEntity() {
   int expectedComponentTypeCount = 1;
   int componentTypeCount = -1;
 
@@ -100,10 +100,10 @@ void testAssignComponentTypeToEntity() {
   ASSERT(componentTypeCount == expectedComponentTypeCount);
   ASSERT(x == expectedX && y == expectedY);
 
-  printf("testAssignComponentTypeToEntity        PASSED\n");
+  printf("TestAssignComponentTypeToEntity        PASSED\n");
 }
 
-void testRemoveComponentTypeFromEntity() {
+void TestRemoveComponentTypeFromEntity() {
   int expectedComponentTypeCount = 1;
   int componentTypeCount = -1;
 
@@ -157,14 +157,14 @@ void testRemoveComponentTypeFromEntity() {
   ASSERT(hasPosComponent == 0);
   ASSERT(entityMask == 0);
 
-  printf("testRemoveComponentTypeFromEntity        PASSED\n");
+  printf("TestRemoveComponentTypeFromEntity        PASSED\n");
 }
 
 int main(void) {
   printf("Running tests for ecc.h\n");
-  testCreateBucket();
-  testDeleteEntityFromBucket();
-  testAssignComponentTypeToEntity();
-  testRemoveComponentTypeFromEntity();
+  TestCreateBucket();
+  TestDeleteEntityFromBucket();
+  TestAssignComponentTypeToEntity();
+  TestRemoveComponentTypeFromEntity();
   return 0;
 }
