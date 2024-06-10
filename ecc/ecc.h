@@ -320,7 +320,7 @@ void *GetComponentForEntity(Bucket *bucket, Entity *entity,
     ComponentType *checkComponentType = bucket->components[i];
     // we've reached the end of the list, return early as there's no component
     // with that name registered
-    if (!checkComponentType) {
+    if (checkComponentType->mask == 0) {
       return NULL;
     }
 
