@@ -75,17 +75,16 @@ void TestAssignComponentTypeToEntity() {
   Bucket *bucket = BucketCreate(testArena, 10);
 
   ComponentType *posComponentType =
-      BucketRegisterComponentType(bucket, sizeof(Position));
+      BucketRegisterComponentType(bucket, sizeof(Position), "Position");
 
   componentTypeCount = bucket->componentIdTop;
 
   size_t entity = BucketCreateEntity(bucket);
 
-  Position *pos = ArenaAllocate(bucket->arena, sizeof(Position));
+
+  Position *pos = AddComponentToEntityById(bucket, entity, posComponentType);
   pos->x = expectedX;
   pos->y = expectedY;
-
-  AddComponentToEntityById(bucket, entity, posComponentType, pos);
   Position *entityPos =
       GetComponentForEntityById(bucket, entity, posComponentType);
   if (entityPos != NULL) {
@@ -103,6 +102,48 @@ void TestAssignComponentTypeToEntity() {
   printf("TestAssignComponentTypeToEntity        PASSED\n");
 }
 
+void TestAssignComponentTypeToEntityWithMacro() {
+  int expectedComponentTypeCount = 1;
+  int componentTypeCount = 0;
+
+  float expectedX = 1.0;
+  float expectedY = 2.0;
+
+  float x, y;
+
+  typedef struct {
+    float x;
+    float y;
+  } Position;
+
+  Arena *testArena = ArenaCreate(TEST_ARENA_SIZE);
+
+  Bucket *bucket = BucketCreate(testArena, 10);
+
+
+  size_t entityId = BucketCreateEntity(bucket);
+  Entity *entity = bucket->entities[entityId];
+
+  Position *pos = ADD_COMPONENT_TO_ENTITY(bucket, entity, Position);
+  pos->x = expectedX;
+  pos->y = expectedY;
+
+  componentTypeCount = bucket->componentIdTop;
+
+  Position *entityPos = GET_COMPONENT_FROM_ENTITY(bucket, entity, Position);
+  if (entityPos != NULL) {
+    x = entityPos->x;
+    y = entityPos->y;
+  }
+
+  ArenaDestroy(testArena);
+
+  ASSERT(componentTypeCount == expectedComponentTypeCount);
+  ASSERT(x == expectedX && y == expectedY);
+
+  printf("TestAssignComponentTypeToEntityMacro        PASSED\n");
+}
+
 void TestRemoveComponentTypeFromEntity() {
   int expectedComponentTypeCount = 1;
   int componentTypeCount = -1;
@@ -110,10 +151,8 @@ void TestRemoveComponentTypeFromEntity() {
   float expectedX = 1.0;
   float expectedY = 2.0;
 
-
   int hasPosComponent = -1;
   size_t entityMask = 0;
-
 
   typedef struct {
     float x;
@@ -125,17 +164,16 @@ void TestRemoveComponentTypeFromEntity() {
   Bucket *bucket = BucketCreate(testArena, 10);
 
   ComponentType *posComponentType =
-      BucketRegisterComponentType(bucket, sizeof(Position));
+      BucketRegisterComponentType(bucket, sizeof(Position), "Position");
 
   componentTypeCount = bucket->componentIdTop;
 
   size_t entity = BucketCreateEntity(bucket);
 
-  Position *pos = ArenaAllocate(bucket->arena, sizeof(Position));
+
+  Position *pos = AddComponentToEntityById(bucket, entity, posComponentType);
   pos->x = expectedX;
   pos->y = expectedY;
-
-  AddComponentToEntityById(bucket, entity, posComponentType, pos);
   Position *entityPos =
       GetComponentForEntityById(bucket, entity, posComponentType);
   if (entityPos != NULL) {
@@ -165,6 +203,7 @@ int main(void) {
   TestCreateBucket();
   TestDeleteEntityFromBucket();
   TestAssignComponentTypeToEntity();
+  TestAssignComponentTypeToEntityWithMacro();
   TestRemoveComponentTypeFromEntity();
   return 0;
 }

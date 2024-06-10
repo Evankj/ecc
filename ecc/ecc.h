@@ -1,5 +1,23 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+// AddComponentToEntity(Bucket *bucket, Entity *entity, size_t componentSize,
+// char *componentName)
+// assert(entity != NULL);
+#define ADD_COMPONENT_TO_ENTITY(bucket, entity, ComponentType)                 \
+  ({                                                                           \
+    ComponentType *comp = AddComponentToEntity(                                \
+        bucket, entity, sizeof(ComponentType), #ComponentType);                \
+    comp; /* Return the pointer to the component */                            \
+  })
+
+#define GET_COMPONENT_FROM_ENTITY(bucket, entity, ComponentType)               \
+  ({                                                                           \
+    ComponentType *comp =                                                      \
+        GetComponentForEntity(bucket, entity, #ComponentType);                 \
+    comp;                                                                      \
+  })
 
 // Memory Arena utilities
 // ---------------------------------------------------------------------------------------------------
@@ -27,11 +45,12 @@ Arena *ArenaCreate(size_t size) {
 
   arena->capacity = size;
 
-
   arena->top = 0;
 
   return arena;
 }
+
+void ArenaClear(Arena *arena) { arena->top = 0; }
 
 // Free
 void ArenaDestroy(Arena *arena) {
@@ -43,12 +62,12 @@ void ArenaDestroy(Arena *arena) {
 // pointer <-> top
 void *ArenaAllocate(Arena *arena, size_t size) {
 
-
   if (arena->top + size > arena->capacity) {
     return NULL;
   }
 
   void *ptr = arena->data + arena->top;
+  memset(ptr, 0, size);
   arena->top += size;
 
   return ptr;
@@ -142,17 +161,23 @@ void *LinkedListPop(LinkedList *list) {
 // So I can change it later to support > 63 component types (0 is no components)
 typedef size_t BitMask;
 const size_t MAX_COMPONENT_TYPES = 63;
+const size_t MAX_QUERIES = 1000;
+
+const size_t MAX_ENTITIES = 10000;
 
 typedef struct {
   BitMask mask; // The bitmask of this component type
+  char *name; // The name of the component (generally provided via the macro) -
+              // it needs to be allocated on the heap and cannot be changed
 
   size_t componentId; // The id of this component type in the bucket to which it
                       // is assigned - this is probably unnecessary
 
   size_t componentSize; // The size of an individual component of this type
 
-  void *entries[]; // pointer to array of pointers to actual structs containing
-                   // the information for this component on a given entity
+  void *entries[MAX_ENTITIES]; // pointer to array of pointers to actual structs
+                               // containing the information for this component
+                               // on a given entity
 
 } ComponentType;
 
@@ -169,33 +194,13 @@ typedef struct {
   LinkedList *freeIndexes;
   size_t maxEntities;
   size_t entityListEnd;
-  Entity *entities[]; // The array of entities to hold all added entities (There
-                      // can be NULL elements if entities are deleted and their
-                      // freed index is not reused)
+  LinkedList *queries;
+
+  Entity *entities[MAX_ENTITIES]; // The array of entities to hold all added
+                                  // entities (There can be NULL elements if
+                                  // entities are deleted and their freed index
+                                  // is not reused)
 } Bucket;
-
-typedef struct {
-  Bucket *bucket;
-  BitMask includeMask;
-  BitMask excludeMask;
-} Query;
-
-Query *QueryCreate(Bucket *bucket) {
-  Query *query = (Query *)ArenaAllocate(bucket->arena, sizeof(Query));
-  query->bucket = bucket;
-  query->includeMask = 0;
-  query->excludeMask = 0;
-
-  return query;
-}
-
-void QueryWithComponentType(Query *query, ComponentType *componentType) {
-  query->includeMask &= componentType->mask;
-}
-
-void QueryWithoutComponentType(Query *query, ComponentType *componentType) {
-  query->excludeMask &= componentType->mask;
-}
 
 Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
   Bucket *bucket = (Bucket *)ArenaAllocate(arena, sizeof(Bucket));
@@ -209,6 +214,7 @@ Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
   bucket->entityListEnd = 0;
   bucket->freeIndexes = LinkedListCreate(arena);
   bucket->maxEntities = maxEntities;
+  bucket->queries = LinkedListCreate(arena);
 
   // allocate component arrays
   size_t pos = arena->top;
@@ -228,8 +234,8 @@ Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
     bucket->components[i] = component;
   }
 
-  for (size_t i = 0; i < maxEntities; i++) {
-    Entity *entity = (Entity *)ArenaAllocate(arena, sizeof(Entity));
+  for (size_t i = 0; i < MAX_ENTITIES; i++) {
+    Entity *entity = ArenaAllocate(arena, sizeof(Entity));
     if (!entity) {
       // something went wrong, free allocated component types and entitise from
       // the arena and exit
@@ -281,7 +287,9 @@ void BucketDeleteEntity(Bucket *bucket, size_t index) {
   //
 }
 
-ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size) {
+ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size,
+                                           char *name) {
+
   size_t index = bucket->componentIdTop++;
 
   ComponentType *component = bucket->components[index];
@@ -289,29 +297,98 @@ ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size) {
   component->mask = 1 << index;
   component->componentSize = size;
   component->componentId = index; // this is probably unnecessary??
+  component->name = name;
 
-  for (int i = 0; i < bucket->maxEntities; i++) {
-    component->entries[i] = ArenaAllocate(bucket->arena, size);
+  for (int i = 0; i < MAX_ENTITIES; i++) {
+    // Stores pointers to memory in an arena, not actual component values
+    component->entries[i] = ArenaAllocate(bucket->arena, sizeof(void *));
   }
 
   return component;
 }
 
-void AddComponentToEntityById(Bucket *bucket, size_t entityId,
-                              ComponentType *componentType, void *component) {
+// Get a component for an entity. This function will search for the component by
+// its name . It is an O(n) operation to check for existence and return the
+// component
+void *GetComponentForEntity(Bucket *bucket, Entity *entity,
+                            char *componentName) {
+  if (!entity || entity->index < 0 || entity->index > MAX_ENTITIES) {
+    return NULL;
+  }
+
+  for (int i = 0; i < MAX_COMPONENT_TYPES; i++) {
+    ComponentType *checkComponentType = bucket->components[i];
+    // we've reached the end of the list, return early as there's no component
+    // with that name registered
+    if (!checkComponentType) {
+      return NULL;
+    }
+
+    if (strcmp(checkComponentType->name, componentName) == 0) {
+      return checkComponentType->entries[entity->index];
+    }
+  }
+  return NULL;
+}
+
+void *AddComponentToEntityById(Bucket *bucket, size_t entityId,
+                               ComponentType *componentType) {
+
   if (entityId < 0 || entityId > bucket->entityListEnd) {
-    return;
+    return NULL;
   }
 
   Entity *entity = bucket->entities[entityId];
   if (entity == NULL) {
-    return;
+    return NULL;
   }
 
-  entity->mask |= componentType->mask;
+  entity->mask = entity->mask | componentType->mask;
 
-
+  void *component = ArenaAllocate(bucket->arena, componentType->componentSize);
   componentType->entries[entity->index] = component;
+
+  return component;
+}
+
+// Add a component to an entity. This function will also register the
+// component to the bucket if it isn't already registered. It is an O(n)
+// operation to check for existence and register the component
+void *AddComponentToEntity(Bucket *bucket, Entity *entity, size_t componentSize,
+                           char *componentName) {
+
+  if (!entity || entity->index < 0 || entity->index > MAX_ENTITIES) {
+    return NULL;
+  }
+
+  // iterate through component types. If we reach a NULL without finding a
+  // componentType with a matching name, it means we need to register a new
+  // one
+  for (int i = 0; i < MAX_COMPONENT_TYPES; i++) {
+    ComponentType *checkComponentType = bucket->components[i];
+    // reached an empty component type, create a new component and break out of
+    // the loop.
+    if (checkComponentType->mask == 0) {
+
+      ComponentType *componentType =
+          BucketRegisterComponentType(bucket, componentSize, componentName);
+      void *componentData =
+          AddComponentToEntityById(bucket, entity->index, componentType);
+
+      return componentData;
+    }
+
+    // reached a component whose name matches
+    if (strcmp(checkComponentType->name, componentName) == 0) {
+      void *componentData =
+          AddComponentToEntityById(bucket, entity->index, checkComponentType);
+      return componentData;
+    }
+  }
+
+  // reached the end of the components list and didn't find a match or a space
+  // to create a new component
+  return NULL;
 }
 
 void RemoveComponentFromEntityById(Bucket *bucket, size_t entityId,
@@ -325,8 +402,8 @@ void RemoveComponentFromEntityById(Bucket *bucket, size_t entityId,
   entity->mask &= ~componentType->mask;
 
   componentType->entries[entity->index] =
-      NULL; // probably don't actually have to do this as it's no longer in the
-            // mask and this isn't saving any space
+      NULL; // probably don't actually have to do this as it's no longer in
+            // the mask and this isn't saving any space
             // TODO: Come back to this
 }
 
@@ -338,7 +415,7 @@ void *GetComponentForEntityById(Bucket *bucket, size_t entityId,
 
   Entity *entity = bucket->entities[entityId];
 
-  if (!((entity->mask & componentType->mask) == componentType->mask)) {
+  if (!((componentType->mask & entity->mask) == componentType->mask)) {
     return NULL;
   }
 
