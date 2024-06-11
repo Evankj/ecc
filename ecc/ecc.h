@@ -19,6 +19,10 @@
     comp;                                                                      \
   })
 
+#define REMOVE_COMPONENT_FROM_ENTITY(bucket, entity, ComponentType)            \
+  ({ RemoveComponentFromEntity(bucket, entity, #ComponentType); })
+
+
 // Memory Arena utilities
 // ---------------------------------------------------------------------------------------------------
 typedef struct {
@@ -307,30 +311,6 @@ ComponentType *BucketRegisterComponentType(Bucket *bucket, size_t size,
   return component;
 }
 
-// Get a component for an entity. This function will search for the component by
-// its name . It is an O(n) operation to check for existence and return the
-// component
-void *GetComponentForEntity(Bucket *bucket, Entity *entity,
-                            char *componentName) {
-  if (!entity || entity->index < 0 || entity->index > MAX_ENTITIES) {
-    return NULL;
-  }
-
-  for (int i = 0; i < MAX_COMPONENT_TYPES; i++) {
-    ComponentType *checkComponentType = bucket->components[i];
-    // we've reached the end of the list, return early as there's no component
-    // with that name registered
-    if (checkComponentType->mask == 0) {
-      return NULL;
-    }
-
-    if (strcmp(checkComponentType->name, componentName) == 0) {
-      return checkComponentType->entries[entity->index];
-    }
-  }
-  return NULL;
-}
-
 void *AddComponentToEntityById(Bucket *bucket, size_t entityId,
                                ComponentType *componentType) {
 
@@ -407,6 +387,32 @@ void RemoveComponentFromEntityById(Bucket *bucket, size_t entityId,
             // TODO: Come back to this
 }
 
+// Remove a component from an entity. This function will search for the
+// component by its name . It is an O(n) operation to check for existence and
+// remove the component
+
+void RemoveComponentFromEntity(Bucket *bucket, Entity *entity,
+                               char *componentName) {
+  if (!entity || entity->index < 0 || entity->index > MAX_ENTITIES) {
+    return;
+  }
+
+  for (int i = 0; i < MAX_COMPONENT_TYPES; i++) {
+    ComponentType *checkComponentType = bucket->components[i];
+    // we've reached the end of the list, return early as there's no component
+    // with that name registered
+    if (checkComponentType->mask == 0) {
+      return;
+    }
+
+    if (strcmp(checkComponentType->name, componentName) == 0) {
+      RemoveComponentFromEntityById(bucket, entity->index, checkComponentType);
+      return;
+    }
+  }
+  return;
+}
+
 void *GetComponentForEntityById(Bucket *bucket, size_t entityId,
                                 ComponentType *componentType) {
   if (entityId < 0 || entityId > bucket->entityListEnd) {
@@ -420,4 +426,29 @@ void *GetComponentForEntityById(Bucket *bucket, size_t entityId,
   }
 
   return componentType->entries[entityId];
+}
+
+// Get a component for an entity. This function will search for the component by
+// its name . It is an O(n) operation to check for existence and return the
+// component
+void *GetComponentForEntity(Bucket *bucket, Entity *entity,
+                            char *componentName) {
+  if (!entity || entity->index < 0 || entity->index > MAX_ENTITIES) {
+    return NULL;
+  }
+
+  for (int i = 0; i < MAX_COMPONENT_TYPES; i++) {
+    ComponentType *checkComponentType = bucket->components[i];
+    // we've reached the end of the list, return early as there's no component
+    // with that name registered
+    if (checkComponentType->mask == 0) {
+      return NULL;
+    }
+
+    if (strcmp(checkComponentType->name, componentName) == 0) {
+      return GetComponentForEntityById(bucket, entity->index,
+                                       checkComponentType);
+    }
+  }
+  return NULL;
 }

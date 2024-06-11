@@ -141,7 +141,7 @@ void TestAssignComponentTypeToEntityWithMacro() {
   ASSERT(componentTypeCount == expectedComponentTypeCount);
   ASSERT(x == expectedX && y == expectedY);
 
-  printf("TestAssignComponentTypeToEntityMacro        PASSED\n");
+  printf("TestAssignComponentTypeToEntityWithMacro        PASSED\n");
 }
 
 void TestRemoveComponentTypeFromEntity() {
@@ -188,7 +188,6 @@ void TestRemoveComponentTypeFromEntity() {
     entityMask = bucket->entities[entity]->mask;
   }
 
-  BucketCreateEntity(bucket);
 
   ArenaDestroy(testArena);
 
@@ -198,6 +197,61 @@ void TestRemoveComponentTypeFromEntity() {
   printf("TestRemoveComponentTypeFromEntity        PASSED\n");
 }
 
+
+void TestRemoveComponentTypeFromEntityWithMacro() {
+  int expectedComponentTypeCount = 1;
+  int componentTypeCount = -1;
+
+  float expectedX = 1.0;
+  float expectedY = 2.0;
+
+  int hasPosComponent = -1;
+  size_t entityMask = 0;
+
+  typedef struct {
+    float x;
+    float y;
+  } Position;
+
+  Arena *testArena = ArenaCreate(TEST_ARENA_SIZE);
+
+  Bucket *bucket = BucketCreate(testArena, 10);
+
+  size_t entityId = BucketCreateEntity(bucket);
+  Entity *entity = bucket->entities[entityId];
+
+  Position *pos = ADD_COMPONENT_TO_ENTITY(bucket, entity, Position);
+  pos->x = expectedX;
+  pos->y = expectedY;
+
+  componentTypeCount = bucket->componentIdTop;
+
+  Position *entityPos = GET_COMPONENT_FROM_ENTITY(bucket, entity, Position);
+      
+  if (entityPos != NULL) {
+    hasPosComponent = 1;
+    entityMask = bucket->entities[entityId]->mask;
+  }
+  
+  REMOVE_COMPONENT_FROM_ENTITY(bucket, entity, Position);
+
+  entityPos = GET_COMPONENT_FROM_ENTITY(bucket, entity, Position);
+
+  if (entityPos == NULL) {
+    hasPosComponent = 0;
+    entityMask = bucket->entities[entityId]->mask;
+  }
+
+  BucketCreateEntity(bucket);
+
+  ArenaDestroy(testArena);
+
+  ASSERT(hasPosComponent == 0);
+  ASSERT(entityMask == 0);
+
+  printf("TestRemoveComponentTypeFromEntityWithMacro        PASSED\n");
+}
+
 int main(void) {
   printf("Running tests for ecc.h\n");
   TestCreateBucket();
@@ -205,5 +259,6 @@ int main(void) {
   TestAssignComponentTypeToEntity();
   TestAssignComponentTypeToEntityWithMacro();
   TestRemoveComponentTypeFromEntity();
+  TestRemoveComponentTypeFromEntityWithMacro();
   return 0;
 }
