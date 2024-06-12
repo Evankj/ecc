@@ -71,13 +71,12 @@ Vector2 ToGridPos(Vector2 position, int gridSize) {
 }
 
 void AddSnakeNode(GameState *gameState) {
-  size_t snakeNodeId = BucketCreateEntity(gameState->bucket);
-  Entity *snakeEntity = gameState->bucket->entities[snakeNodeId];
+  Entity *snakeEntity = BucketCreateEntity(gameState->bucket);
 
   SnakeNode *node =
       ADD_COMPONENT_TO_ENTITY(gameState->bucket, snakeEntity, SnakeNode);
   node->next = gameState->tailTip;
-  node->entity = gameState->bucket->entities[snakeNodeId];
+  node->entity = snakeEntity;
 
   GridPosition *tailPos = GET_COMPONENT_FROM_ENTITY(
       gameState->bucket, gameState->tailTip->entity, GridPosition);
@@ -375,8 +374,7 @@ GameState *InitialiseGame() {
   gameState->screenWidth = 800;
   gameState->screenHeight = 800;
 
-  size_t snakeIndex = BucketCreateEntity(gameWorld);
-  gameState->snakeHead = gameWorld->entities[snakeIndex];
+  gameState->snakeHead = BucketCreateEntity(gameWorld);
 
   SnakeHead *snakeHead =
       ADD_COMPONENT_TO_ENTITY(gameWorld, gameState->snakeHead, SnakeHead);
@@ -426,8 +424,7 @@ GameState *InitialiseGame() {
   gameState->tailTip = snakeHeadNode;
 
   // Setup apple
-  size_t appleIndex = BucketCreateEntity(gameWorld);
-  Entity *apple = gameWorld->entities[appleIndex];
+  Entity *apple = BucketCreateEntity(gameWorld);
 
   Apple *gameApple = ADD_COMPONENT_TO_ENTITY(gameWorld, apple, Apple);
 

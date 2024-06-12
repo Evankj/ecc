@@ -254,7 +254,7 @@ Bucket *BucketCreate(Arena *arena, size_t maxEntities) {
   return bucket;
 }
 
-size_t BucketCreateEntity(Bucket *bucket) {
+Entity *BucketCreateEntity(Bucket *bucket) {
 
   // size_t index;
   // size_t val = (size_t)LinkedListPop(bucket->freeIndexes);
@@ -272,7 +272,7 @@ size_t BucketCreateEntity(Bucket *bucket) {
 
   bucket->entityCount++;
 
-  return index;
+  return entity;
 }
 
 void BucketDeleteEntity(Bucket *bucket, size_t index) {

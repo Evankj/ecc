@@ -44,9 +44,8 @@ void RunBenchmark(int iterations) {
   for (int i = 0; i < iterations; i++) {
 
     // fprintf(stdout, "Iteration %d\n", i);
-    size_t entityId = BucketCreateEntity(bucket);
 
-    Entity *entity = bucket->entities[entityId];
+    Entity *entity = BucketCreateEntity(bucket);
 
     // fprintf(stdout, "Creating component...\n");
     ExampleComponent *component = ADD_COMPONENT_TO_ENTITY(
@@ -63,7 +62,7 @@ void RunBenchmark(int iterations) {
     }
 
     // fprintf(stdout, "Removing entity...\n");
-    BucketDeleteEntity(bucket, entityId);
+    BucketDeleteEntity(bucket, entity->index);
     bucket->entityListEnd = 0;
   }
 

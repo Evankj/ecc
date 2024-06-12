@@ -79,14 +79,14 @@ void TestAssignComponentTypeToEntity() {
 
   componentTypeCount = bucket->componentIdTop;
 
-  size_t entity = BucketCreateEntity(bucket);
+  Entity *entity = BucketCreateEntity(bucket);
 
 
-  Position *pos = AddComponentToEntityById(bucket, entity, posComponentType);
+  Position *pos = AddComponentToEntityById(bucket, entity->index, posComponentType);
   pos->x = expectedX;
   pos->y = expectedY;
   Position *entityPos =
-      GetComponentForEntityById(bucket, entity, posComponentType);
+      GetComponentForEntityById(bucket, entity->index, posComponentType);
   if (entityPos != NULL) {
     x = entityPos->x;
     y = entityPos->y;
@@ -121,8 +121,7 @@ void TestAssignComponentTypeToEntityWithMacro() {
   Bucket *bucket = BucketCreate(testArena, 10);
 
 
-  size_t entityId = BucketCreateEntity(bucket);
-  Entity *entity = bucket->entities[entityId];
+  Entity *entity = BucketCreateEntity(bucket);
 
   Position *pos = ADD_COMPONENT_TO_ENTITY(bucket, entity, Position);
   pos->x = expectedX;
@@ -168,24 +167,24 @@ void TestRemoveComponentTypeFromEntity() {
 
   componentTypeCount = bucket->componentIdTop;
 
-  size_t entity = BucketCreateEntity(bucket);
+  Entity *entity = BucketCreateEntity(bucket);
 
 
-  Position *pos = AddComponentToEntityById(bucket, entity, posComponentType);
+  Position *pos = AddComponentToEntityById(bucket, entity->index, posComponentType);
   pos->x = expectedX;
   pos->y = expectedY;
   Position *entityPos =
-      GetComponentForEntityById(bucket, entity, posComponentType);
+      GetComponentForEntityById(bucket, entity->index, posComponentType);
   if (entityPos != NULL) {
     hasPosComponent = 1;
-    entityMask = bucket->entities[entity]->mask;
+    entityMask = entity->mask;
   }
 
-  RemoveComponentFromEntityById(bucket, entity, posComponentType);
-  entityPos = GetComponentForEntityById(bucket, entity, posComponentType);
+  RemoveComponentFromEntityById(bucket, entity->index, posComponentType);
+  entityPos = GetComponentForEntityById(bucket, entity->index, posComponentType);
   if (entityPos == NULL) {
     hasPosComponent = 0;
-    entityMask = bucket->entities[entity]->mask;
+    entityMask = entity->mask;
   }
 
 
@@ -217,8 +216,7 @@ void TestRemoveComponentTypeFromEntityWithMacro() {
 
   Bucket *bucket = BucketCreate(testArena, 10);
 
-  size_t entityId = BucketCreateEntity(bucket);
-  Entity *entity = bucket->entities[entityId];
+  Entity *entity = BucketCreateEntity(bucket);
 
   Position *pos = ADD_COMPONENT_TO_ENTITY(bucket, entity, Position);
   pos->x = expectedX;
@@ -230,7 +228,7 @@ void TestRemoveComponentTypeFromEntityWithMacro() {
       
   if (entityPos != NULL) {
     hasPosComponent = 1;
-    entityMask = bucket->entities[entityId]->mask;
+    entityMask = entity->mask;
   }
   
   REMOVE_COMPONENT_FROM_ENTITY(bucket, entity, Position);
@@ -239,7 +237,7 @@ void TestRemoveComponentTypeFromEntityWithMacro() {
 
   if (entityPos == NULL) {
     hasPosComponent = 0;
-    entityMask = bucket->entities[entityId]->mask;
+    entityMask = entity->mask;
   }
 
   BucketCreateEntity(bucket);
